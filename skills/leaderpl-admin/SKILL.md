@@ -137,6 +137,7 @@ module.exports = async (req, res) => {
 ### 3-2. `admin/index.html` — 화면 (주소: `내사이트/admin`)
 
 - `<meta name="robots" content="noindex, nofollow">`
+- CSS에 `[hidden]{display:none!important}`를 넣는다(로그인 칸에 display를 주면 숨김이 안 먹는 흔한 실수 방지)
 - 처음엔 비밀번호 입력칸만. 입력하면 `/api/admin`에 `x-admin-password` 헤더로 보낸다
 - 비밀번호는 **sessionStorage**(탭을 닫으면 사라짐)에만 잠깐 둔다. localStorage·쿠키·URL에 넣지 않는다
 - 맨 위에 **새 문의 개수**를 크게. 그 아래 최신순 목록: 날짜 · 이름 · 연락처 · 내용 · 상태 버튼
@@ -144,7 +145,7 @@ module.exports = async (req, res) => {
 - 연락처는 눌러서 복사할 수 있게(`navigator.clipboard.writeText`, 실패하면 선택 상태로)
 - **폰 화면 우선**: 표 대신 카드 목록, 글자 16px 이상, 버튼 손가락 크기
 - 사이트 디자인 색을 따르되 관리 화면은 단정하게(장식 없이)
-- 비밀번호가 틀리면 "비밀번호가 맞지 않아요."만. 다른 정보는 보여 주지 않는다
+- 비밀번호가 틀리면 "비밀번호가 맞지 않아요."만. 다른 정보는 보여 주지 않는다. 입력칸은 비우고 다시 입력할 수 있게 포커스
 
 ### 3-3. 끝나면 사용자에게 알려 줄 "내가 할 일"
 
