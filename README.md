@@ -15,7 +15,7 @@
 1. 출처와 내용 먼저 확인
    ```
    이 저장소의 스킬 두 개(leaderpl-site-prd, leaderpl-admin)를 설치하기 전에 확인하고 싶어.
-   [이 저장소 주소]
+   https://github.com/naknakfishing/leaderpl-skills
    각 SKILL.md를 읽고 무엇을 하는 스킬인지 한 줄씩 알려 줘.
    파일을 지우거나 밖으로 보내는 명령, 비밀번호나 키를 달라는 부분이 있으면 그 줄을 보여 줘.
    아직 설치하지는 마.
