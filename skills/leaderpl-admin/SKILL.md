@@ -8,7 +8,7 @@ description: HTML로 만든 작은 사이트(Vercel 배포)에 문의 폼 저장
 리더플AI(이신영)가 「리더플 AI 스쿨 실습실」 수업용으로 만든 스킬이다.
 코딩을 모르는 사람이 만든 사이트에 **문의를 저장하고, 폰으로 확인하고, 처리 상태를 관리하는 화면**을 붙인다.
 
-이 스킬이 하는 일: 사이트 폴더 안에 파일을 만들고 고친다(`api/`, `admin/`, 문의 폼). 그리고 사용자가 직접 할 일(SQL 실행, 환경변수 입력)을 안내한다.
+이 스킬이 하는 일: 사이트 폴더 안에 파일을 만들고 고친다(`api/`, `admin/`, 문의 폼). Supabase 표도 일회용 통로로 직접 만들고 바로 지운다. 사용자가 직접 할 일은 관리자 비밀번호 입력 하나다.
 이 스킬이 하지 않는 일: 비밀번호·키 값을 묻거나 파일에 적기, 데이터 지우기, 사이트 밖으로 데이터 보내기.
 
 ## 0. 먼저 확인할 것 (매번)
@@ -31,7 +31,34 @@ description: HTML로 만든 작은 사이트(Vercel 배포)에 문의 폼 저장
 
 ## 2. 문의 저장
 
-### 2-1. 표 만들기 SQL — 사용자가 Supabase **SQL Editor**에 붙여 넣고 Run
+### 2-0. 표는 클로드가 만든다 (기본 방법)
+
+사용자에게 SQL Editor를 시키지 않는다. 아래 순서로 클로드가 직접 만든다.
+
+1. `api/setup-db.js`(일회용)와 `package.json`(`"pg": "^8.13.0"` 하나만)을 만든다. 내용은 2-1의 SQL을 실행하는 함수:
+   ```js
+   // 한 번만 쓰는 표 만들기 통로 — 표가 생기면 이 파일은 지운다. 데이터는 읽지도 보내지도 않는다.
+   const { Client } = require('pg');
+   const SQL = `/* 2-1의 SQL 전체 */`;
+   module.exports = async (req, res) => {
+     if (req.method !== 'POST') return res.status(405).json({ error: 'POST만 가능해요' });
+     const url = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
+     if (!url) return res.status(500).json({ error: '데이터베이스 연결 정보가 없어요. Vercel Storage에서 Supabase를 연결해 주세요.' });
+     const client = new Client({ connectionString: url.replace(/[?&]sslmode=[^&]*/, ''), ssl: { rejectUnauthorized: false } });
+     try { await client.connect(); await client.query(SQL); return res.status(200).json({ ok: true }); }
+     catch (e) { return res.status(500).json({ error: '표를 만들지 못했어요', detail: String(e.message).slice(0, 200) }); }
+     finally { await client.end().catch(() => {}); }
+   };
+   ```
+2. 커밋 → 푸시 → Vercel 자동 배포를 1~2분 기다린다(`GET 사이트주소/api/setup-db`가 405를 돌려주면 배포 완료).
+3. 클로드가 직접 `POST 사이트주소/api/setup-db` 를 한 번 보낸다 → `{"ok":true}`.
+4. **바로 `api/setup-db.js`와 `package.json`을 지우고** 커밋 → 푸시. (`/api/setup-db`가 404가 되면 끝)
+5. 사용자에게 "Supabase → Table Editor → inquiries 에서 표를 볼 수 있어요"라고 알려 준다.
+
+안 될 때만(예: `POSTGRES_URL`이 없음) 아래 2-1 SQL을 사용자에게 주고 Supabase **SQL Editor**에서 Run 하게 한다.
+2026-10-06 새싹 공방 데모에서 이 순서로 표 생성 → 문의 저장 → /admin 조회까지 확인했다.
+
+### 2-1. 표 SQL (2-0이 실행하는 내용 · 막힐 때만 SQL Editor에 붙여 넣기)
 
 폼에 받을 칸이 다르면 `message` 자리에 칸을 바꾸거나 더한다. 상태 값 세 개는 바꾸지 않는다.
 
@@ -150,6 +177,7 @@ module.exports = async (req, res) => {
 ### 3-3. 끝나면 사용자에게 알려 줄 "내가 할 일"
 
 1. (처음 한 번) Vercel → 내 프로젝트 → **Settings → Environment Variables** → Key `ADMIN_PASSWORD`, Value 내가 정한 비밀번호 → Save
+   (사용자의 컴퓨터에 Vercel CLI 로그인이 되어 있으면 클로드가 무작위 비밀번호를 만들어 `vercel env add ADMIN_PASSWORD production --sensitive`로 넣고, 값은 깃에 안 올라가는 로컬 파일 `.admin-password.txt`에만 저장해도 된다. 대화에는 적지 않는다.)
 2. **Deployments** → 맨 위 배포 → **Redeploy** (환경변수는 다시 배포해야 적용돼요)
 3. 폰에서 `내사이트/admin` → 비밀번호 → 테스트 문의 확인 → 상태 바꿔 보기
 4. 비밀번호는 클로드 대화창·채팅·화면공유에 쓰지 않기
@@ -175,6 +203,6 @@ module.exports = async (req, res) => {
 ## 6. 막혔을 때 확인 순서
 
 1. Vercel → Storage에 Supabase가 이 프로젝트에 **Connected**인가
-2. Supabase **Table Editor**에 `inquiries` 표가 있는가 (없으면 SQL Editor에서 2-1 실행)
+2. Supabase **Table Editor**에 `inquiries` 표가 있는가 (없으면 2-0을 다시, 그래도 안 되면 SQL Editor에서 2-1 실행)
 3. 환경변수를 넣은 뒤 **Redeploy** 했는가
 4. 브라우저 개발자 도구가 아니라 **사용자가 본 화면 문구**를 캡처로 받아 원인을 쉬운 말로 설명한다
