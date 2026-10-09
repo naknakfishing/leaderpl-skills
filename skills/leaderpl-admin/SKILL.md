@@ -35,7 +35,10 @@ description: HTML로 만든 작은 사이트(Vercel 배포)에 문의 폼 저장
 
 사용자에게 SQL Editor를 시키지 않는다. 아래 순서로 클로드가 직접 만든다.
 
-1. `api/setup-db.js`(일회용)와 `package.json`(`"pg": "^8.13.0"` 하나만)을 만든다. 내용은 2-1의 SQL을 실행하는 함수:
+1. `api/setup-db.js`(일회용)를 만들고, `pg` 패키지를 잠깐 쓸 수 있게 한다.
+   - `package.json`이 **없으면** `"pg": "^8.13.0"` 하나만 든 `package.json`을 새로 만든다.
+   - `package.json`이 **이미 있으면** 덮어쓰지 말고 dependencies에 `"pg": "^8.13.0"` 한 줄만 더한다. 원래 내용을 기억해 둔다.
+   `api/setup-db.js` 내용은 2-1의 SQL을 실행하는 함수:
    ```js
    // 한 번만 쓰는 표 만들기 통로 — 표가 생기면 이 파일은 지운다. 데이터는 읽지도 보내지도 않는다.
    const { Client } = require('pg');
@@ -52,7 +55,7 @@ description: HTML로 만든 작은 사이트(Vercel 배포)에 문의 폼 저장
    ```
 2. 커밋 → 푸시 → Vercel 자동 배포를 1~2분 기다린다(`GET 사이트주소/api/setup-db`가 405를 돌려주면 배포 완료).
 3. 클로드가 직접 `POST 사이트주소/api/setup-db` 를 한 번 보낸다 → `{"ok":true}`.
-4. **바로 `api/setup-db.js`와 `package.json`을 지우고** 커밋 → 푸시. (`/api/setup-db`가 404가 되면 끝)
+4. **바로 `api/setup-db.js`를 지우고**, `package.json`은 1에서 새로 만들었으면 지우고, 원래 있던 파일이면 `pg` 한 줄만 빼서 원래대로 되돌린 뒤 커밋 → 푸시. (`/api/setup-db`가 404가 되면 끝)
 5. 사용자에게 "Supabase → Table Editor → inquiries 에서 표를 볼 수 있어요"라고 알려 준다.
 
 안 될 때만(예: `POSTGRES_URL`이 없음) 아래 2-1 SQL을 사용자에게 주고 Supabase **SQL Editor**에서 Run 하게 한다.
@@ -109,6 +112,7 @@ module.exports = async (req, res) => {
 - 칸: 이름 · 연락처 · (PRD의 "문의 폼에서 받을 것" 하나) · 동의 체크(필수, 목적·보관 기간을 한 줄로)
 - 화면에 안 보이는 `website` 칸 하나(스팸 함정, `tabindex="-1"`, `autocomplete="off"`)
 - 제출: `fetch('/api/inquiry', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(값) })`
+- 동의 값은 반드시 `consent: 동의체크박스.checked`(true/false)로 보낸다. 폼 값을 그대로 묶으면 `"on"`이 가서 체크해도 저장이 거절된다
 - 완료 문구: "문의가 접수됐어요. 확인 후 연락드릴게요." — **지킬 수 없는 답변 시간은 쓰지 않는다**
 - 실패 문구는 서버가 준 한국어 메시지를 그대로 보여 준다
 - 질문이 많을수록 문의가 줄어든다. 칸은 최소로
@@ -176,8 +180,8 @@ module.exports = async (req, res) => {
 
 ### 3-3. 끝나면 사용자에게 알려 줄 "내가 할 일"
 
-1. (처음 한 번) Vercel → 내 프로젝트 → **Settings → Environment Variables** → Key `ADMIN_PASSWORD`, Value 내가 정한 비밀번호 → Save
-   (사용자의 컴퓨터에 Vercel CLI 로그인이 되어 있으면 클로드가 무작위 비밀번호를 만들어 `vercel env add ADMIN_PASSWORD production --sensitive`로 넣고, 값은 깃에 안 올라가는 로컬 파일 `.admin-password.txt`에만 저장해도 된다. 대화에는 적지 않는다.)
+1. (처음 한 번) Vercel → 내 프로젝트 → **Settings → Environment Variables** → Key `ADMIN_PASSWORD`, Value 내가 정한 비밀번호(짧거나 쉬운 것 말고) → Save
+   비밀번호는 사용자가 직접 정해서 넣는다. 클로드가 대신 만들거나 파일·대화에 적지 않는다.
 2. **Deployments** → 맨 위 배포 → **Redeploy** (환경변수는 다시 배포해야 적용돼요)
 3. 폰에서 `내사이트/admin` → 비밀번호 → 테스트 문의 확인 → 상태 바꿔 보기
 4. 비밀번호는 클로드 대화창·채팅·화면공유에 쓰지 않기
