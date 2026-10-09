@@ -1,6 +1,6 @@
 ---
 name: leaderpl-admin
-description: HTML로 만든 작은 사이트(Vercel 배포)에 문의 폼 저장(/api 함수 + Supabase)과 비밀번호로 잠긴 /admin 관리자 페이지를 만든다. 문의 목록·상태(새 문의 → 연락함 → 완료)·48시간 알림·30일 추이·CSV 같은 관리 기능도 이 기준으로 추가한다. 사용자가 "문의 폼", "Supabase에 저장", "관리자 페이지", "/admin", "문의함"을 말하면 쓴다.
+description: HTML로 만든 작은 사이트(Vercel 배포)에 문의 폼 저장(/api 함수 + Supabase)과 비밀번호로 잠긴 /admin 관리자 페이지를 만든다. 문의 목록·상태(새 문의 → 연락함 → 완료)·48시간 알림·30일 추이·CSV 같은 관리 기능도 이 기준으로 추가한다. 사용자가 원하면 Supabase Auth로 회원가입·로그인·회원 전용 페이지와 관리자 화면의 회원 목록도 붙인다. 사용자가 "문의 폼", "Supabase에 저장", "관리자 페이지", "/admin", "문의함", "회원가입", "로그인"을 말하면 쓴다.
 ---
 
 # 리더플 관리자 페이지 스킬
@@ -200,9 +200,97 @@ module.exports = async (req, res) => {
 
 더 큰 기능(콘텐츠 직접 수정, 완료 후 자동 삭제, 알림 메일)은 표와 `/api`가 더 필요하다. 바로 만들지 말고 **필요한 것과 순서를 먼저 설명**한다.
 
-## 5. 회원가입·로그인을 물으면
+## 5. 회원가입·로그인 (사용자가 원할 때만)
 
-"Supabase **Auth**로 만들 수 있어요"라고 답하고, 만들기 전에 필요한 것(개인정보 처리방침, 동의 문구, Supabase Authentication 설정, 브라우저에는 공개 키만)을 먼저 정리한다. 처리방침 내용은 지어내지 않고 자리만 만든다.
+관리자 페이지를 만들 때나 만든 뒤에 사용자가 "회원가입도", "로그인도", "회원 전용 페이지"를 말하면 이 절대로 더한다. 묻지 않았으면 먼저 만들지 않는다.
+Supabase **Auth**(이메일 + 비밀번호)를 쓴다. 문의함(`inquiries`)과 관리자 비밀번호(`ADMIN_PASSWORD`)는 그대로 두고 **따로** 붙인다. 손님 회원 로그인과 사장님 관리자 로그인은 다른 문이다.
+
+### 5-0. 만들기 전에 사용자에게 먼저 말할 것 (짧게, 번호로)
+
+1. 회원 정보(이메일)를 받으면 **개인정보 처리방침**이 필요하다. 내용은 지어내지 않고 `privacy.html` 자리만 만든다. 실제 내용은 사용자가 채운다.
+2. Supabase 화면에서 사용자가 직접 할 설정 두 가지(5-5). 메뉴 이름은 바뀔 수 있으니 "제 기준으로는"을 붙인다.
+3. 받는 것은 **이메일·비밀번호·동의 체크**만. 이름·전화번호 같은 칸은 사용자가 원할 때만 더한다.
+
+### 5-1. 원칙
+
+- **브라우저에는 공개 키(anon/publishable)만** 쓴다. 공개 키는 로그인 창구용이라 노출돼도 되지만, 서버 키(`SUPABASE_SERVICE_ROLE_KEY`·`SUPABASE_SECRET_KEY`)는 계속 `/api`에만.
+- 공개 키는 HTML에 값으로 적지 않고 `/api/auth-config`가 환경변수에서 읽어 내려 준다(키를 바꿔도 코드 수정 없음).
+  - 주소: `SUPABASE_URL` → `NEXT_PUBLIC_SUPABASE_URL`
+  - 공개 키: `SUPABASE_ANON_KEY` → `NEXT_PUBLIC_SUPABASE_ANON_KEY` → `SUPABASE_PUBLISHABLE_KEY` → `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- 패키지 설치 없이 `fetch`로 Supabase Auth REST(`/auth/v1/...`)를 부른다.
+- 로그인 표(세션)는 **sessionStorage**에 둔다(탭을 닫으면 로그아웃). 오래 유지하자고 하면 그때 localStorage로 바꾸고 이유를 말한다.
+- 회원 전용 내용은 HTML에 그대로 두지 않고 `/api/members`가 **로그인 확인 후에만** 내려 준다(HTML에 두면 로그인 없이도 소스 보기로 보인다).
+- 비밀번호는 **8자 이상**. 비밀번호 값은 어디에도 저장·출력하지 않는다.
+
+### 5-2. `api/auth-config.js` — 공개 정보만 내려 주기
+
+```js
+module.exports = (req, res) => {
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !key) return res.status(500).json({ error: 'Supabase 공개 키가 없어요. Vercel Storage 연결 후 다시 배포해 주세요.' });
+  res.setHeader('Cache-Control', 'no-store');
+  return res.status(200).json({ url, key }); // 공개 키만. 서버 키는 절대 여기 넣지 않는다
+};
+```
+
+### 5-3. 화면 — `signup.html` · `login.html` · `members.html`
+
+- 처음에 `/api/auth-config`로 `url`·`key`를 받는다. 모든 Auth 요청 헤더: `apikey: key`, `Content-Type: application/json`
+- **회원가입**: `POST {url}/auth/v1/signup` · body `{ email, password, data: { consent: true, consent_at: 지금시각 } }`
+  - 동의 체크(필수, 목적·보관 기간 한 줄 + `privacy.html` 링크)가 `.checked`일 때만 보낸다
+  - 응답에 `access_token`이 있으면 바로 로그인 상태로, 없으면 "확인 메일을 보냈어요. 메일의 링크를 누른 뒤 로그인해 주세요."
+- **로그인**: `POST {url}/auth/v1/token?grant_type=password` · body `{ email, password }` → `access_token`을 sessionStorage에 두고 `members.html`로
+- **비밀번호 찾기**: `POST {url}/auth/v1/recover` · body `{ email }` → "메일을 확인해 주세요" (가입 여부는 알려 주지 않는다)
+- **로그아웃**: `POST {url}/auth/v1/logout`(헤더에 `Authorization: Bearer 토큰`) 후 sessionStorage 비우기
+- **members.html**: 토큰이 없으면 `login.html`로. 있으면 `/api/members`에 `Authorization: Bearer 토큰`으로 요청해 받은 내용만 보여 준다. 401이면 토큰 지우고 로그인으로
+- 오류 문구는 쉬운 한국어로: 비밀번호 틀림·없는 계정은 똑같이 "이메일 또는 비밀번호가 맞지 않아요."
+- 세 페이지와 `members.html`은 `noindex`. 첫 화면 메뉴에 "로그인" 링크 하나
+- 폰 화면 우선, 사이트 디자인 색을 따른다
+
+### 5-4. `api/members.js` — 로그인한 사람에게만 내용 주기
+
+```js
+module.exports = async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  if (!url || !key) return res.status(500).json({ error: 'Supabase 연결 정보가 없어요.' });
+  if (!token) return res.status(401).json({ error: '로그인이 필요해요.' });
+  const r = await fetch(`${url}/auth/v1/user`, { headers: { apikey: key, Authorization: `Bearer ${token}` } });
+  if (!r.ok) return res.status(401).json({ error: '다시 로그인해 주세요.' });
+  const user = await r.json();
+  return res.status(200).json({
+    email: user.email,
+    // 회원 전용 내용: 사용자가 준 내용만. 없으면 "준비 중"
+    content: '회원 전용 내용은 준비 중이에요.',
+  });
+};
+```
+
+### 5-5. 사용자가 Supabase 화면에서 할 일 (끝나면 번호로 알려 준다)
+
+1. Vercel → Storage → my-site-db → **Open in Supabase** → **Authentication**
+2. **URL Configuration** → Site URL에 내 사이트 주소(https://…vercel.app 또는 내 도메인) → Save. 확인 메일 링크가 이 주소로 돌아온다
+3. (수업·테스트용) **Sign In / Providers → Email**에서 **Confirm email**을 끄면 확인 메일 없이 바로 가입된다. 실제로 손님을 받을 때는 다시 켜는 것을 권한다
+   - Supabase 기본 메일은 시간당 보낼 수 있는 수가 아주 적다. 가입이 많으면 메일 발송 설정(SMTP)이 따로 필요하다고 한 줄로 알려 준다
+
+### 5-6. 관리자 페이지에 "회원" 보기 더하기 (사용자가 원하면)
+
+- `api/admin.js`의 GET에 `?view=members`를 더한다. 같은 관리자 비밀번호 확인을 거친 뒤 서버 키로
+  `GET {SB_URL}/auth/v1/admin/users?page=1&per_page=200` (헤더는 `sbHeaders()`) → `users`에서 **이메일 · 가입일 · 마지막 로그인**만 골라 돌려준다
+- `admin/index.html`에 [문의함 | 회원] 탭. 맨 위에 회원 수
+- 회원 삭제·비밀번호 바꾸기·메일 보내기 버튼은 만들지 않는다. 필요하면 Supabase 화면에서 하도록 안내한다
+
+### 5-7. 확인 (사용자와 같이)
+
+1. 테스트 이메일로 가입 → (Confirm email을 켰다면 메일 링크) → 로그인 → `members.html`에 내 이메일이 보인다
+2. 로그아웃 후 `members.html` 주소로 바로 들어가면 로그인 화면으로 돌아간다
+3. `/admin` → 회원 탭에 방금 가입한 이메일이 보인다
+4. 사이트 파일 어디에도 서버 키 값이 없다(공개 키도 값으로 적혀 있지 않다)
 
 ## 6. 막혔을 때 확인 순서
 
@@ -210,3 +298,4 @@ module.exports = async (req, res) => {
 2. Supabase **Table Editor**에 `inquiries` 표가 있는가 (없으면 2-0을 다시, 그래도 안 되면 SQL Editor에서 2-1 실행)
 3. 환경변수를 넣은 뒤 **Redeploy** 했는가
 4. 브라우저 개발자 도구가 아니라 **사용자가 본 화면 문구**를 캡처로 받아 원인을 쉬운 말로 설명한다
+5. (회원가입) 가입했는데 로그인이 안 되면 → 확인 메일을 눌렀는지, 또는 5-5의 Confirm email 설정. 메일이 안 오면 → 시간당 발송 한도. 메일 링크가 엉뚱한 주소로 가면 → 5-5의 Site URL
