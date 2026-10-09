@@ -183,7 +183,7 @@ module.exports = async (req, res) => {
 
 ### 3-3. 끝나면 사용자에게 알려 줄 "내가 할 일"
 
-1. (처음 한 번) Vercel → 내 프로젝트 → **Settings → Environment Variables** → Key `ADMIN_PASSWORD`, Value 내가 정한 비밀번호(짧거나 쉬운 것 말고) → Save
+1. (처음 한 번) Vercel → 내 프로젝트 → 왼쪽 메뉴 **Environment Variables**(Settings 안이 아니라 프로젝트 왼쪽 메뉴에 바로 있음) → **Add Environment Variable** → Key `ADMIN_PASSWORD`, Value 내가 정한 비밀번호(짧거나 쉬운 것 말고) → Save
    비밀번호는 사용자가 직접 정해서 넣는다. 클로드가 대신 만들거나 파일·대화에 적지 않는다.
 2. **Deployments** → 맨 위 배포 → **Redeploy** (환경변수는 다시 배포해야 적용돼요)
 3. 폰에서 `내사이트/admin` → 비밀번호 → 테스트 문의 확인 → 상태 바꿔 보기
