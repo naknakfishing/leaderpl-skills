@@ -8,8 +8,8 @@ description: HTML로 만든 작은 사이트(Vercel 배포)에 문의 폼 저장
 리더플AI(이신영)가 「리더플 AI 스쿨 실습실」 수업용으로 만든 스킬이다.
 코딩을 모르는 사람이 만든 사이트에 **문의를 저장하고, 폰으로 확인하고, 처리 상태를 관리하는 화면**을 붙인다.
 
-이 스킬이 하는 일: 사이트 폴더 안에 파일을 만들고 고친다(`api/`, `admin/`, 문의 폼). Supabase 표도 일회용 통로로 직접 만들고 바로 지운다. 사용자가 직접 할 일은 관리자 비밀번호 입력 하나다.
-이 스킬이 하지 않는 일: 비밀번호·키 값을 묻거나 파일에 적기, 데이터 지우기, 사이트 밖으로 데이터 보내기.
+이 스킬이 하는 일: 사이트 폴더 안에 파일을 만들고 고친다(`api/`, `admin/`, 문의 폼). Supabase 표도 일회용 통로로 직접 만들고 바로 지운다. 관리자 비밀번호도 클로드가 무작위로 만들어 Vercel 환경변수에 넣고 사용자에게 한 번만 알려 준다(3-3). 사용자가 직접 할 일은 로그인뿐이다.
+이 스킬이 하지 않는 일: 비밀번호·키 값을 묻거나 코드·파일·커밋에 적기, 데이터 지우기, 사이트 밖으로 데이터 보내기.
 
 ## 0. 먼저 확인할 것 (매번)
 
@@ -19,10 +19,10 @@ description: HTML로 만든 작은 사이트(Vercel 배포)에 문의 폼 저장
 
 ## 1. 지켜야 할 원칙 (가장 중요)
 
-- **키와 비밀번호는 코드·대화·파일 어디에도 값으로 적지 않는다.** 환경변수 이름으로만 읽는다.
+- **키와 비밀번호는 코드·파일·커밋 어디에도 값으로 적지 않는다.** 환경변수 이름으로만 읽는다. (예외: 클로드가 만든 관리자 비밀번호는 사용자에게 대화로 한 번만 알려 준다 — 3-3)
   - Supabase 주소: `SUPABASE_URL` 없으면 `NEXT_PUBLIC_SUPABASE_URL`
   - Supabase 서버 키: `SUPABASE_SERVICE_ROLE_KEY` 없으면 `SUPABASE_SECRET_KEY`
-  - 관리자 비밀번호: `ADMIN_PASSWORD` — 값은 **사용자가 Vercel 화면에서 직접** 넣는다
+  - 관리자 비밀번호: `ADMIN_PASSWORD` — 값은 **클로드가 무작위로 만들어 Vercel CLI로** 넣는다(3-3). 안 되면 사용자가 Vercel 화면에서 직접
 - **브라우저 쪽 코드(HTML·JS)에는 Supabase 키가 하나도 없다.** 저장·조회·수정은 전부 `/api` 함수가 한다.
 - 표에는 **RLS(행 보안)를 켜고 정책은 만들지 않는다** → 공개 키로는 아무도 읽고 쓸 수 없고, 서버 키를 가진 `/api`만 접근한다.
 - 패키지 설치 없이 동작하게 한다(`fetch`로 Supabase REST API 호출). `package.json`이 없어도 된다.
@@ -183,11 +183,15 @@ module.exports = async (req, res) => {
 
 ### 3-3. 끝나면 사용자에게 알려 줄 "내가 할 일"
 
-1. (처음 한 번) Vercel → 내 프로젝트 → 왼쪽 메뉴 **Environment Variables**(Settings 안이 아니라 프로젝트 왼쪽 메뉴에 바로 있음) → **Add Environment Variable** → Key `ADMIN_PASSWORD`, Value 내가 정한 비밀번호(짧거나 쉬운 것 말고) → Save
-   비밀번호는 사용자가 직접 정해서 넣는다. 클로드가 대신 만들거나 파일·대화에 적지 않는다.
-2. **Deployments** → 맨 위 배포 → **Redeploy** (환경변수는 다시 배포해야 적용돼요)
+1. (처음 한 번 · 클로드가 한다) 관리자 비밀번호를 무작위로 만들어(영문 대소문자+숫자 16자 이상) Vercel 환경변수에 넣는다.
+   - 값은 화면·로그·파일에 남지 않게 표준입력으로 넘긴다. 예(bash): `printf '%s' "$PW" | npx vercel env add ADMIN_PASSWORD production --sensitive` (윈도우 PowerShell이면 `npx.cmd`)
+   - 이미 있으면 `npx vercel env rm ADMIN_PASSWORD production --yes` 뒤 다시 넣는다
+   - 넣은 뒤 다시 배포한다(`npx vercel --prod --yes` 또는 빈 Commit을 푸시). 환경변수는 다시 배포해야 적용된다
+   - 코드·파일·커밋·.env 어디에도 값을 적지 않는다
+2. 사용자에게 **이 대화에서 딱 한 번** 알려 준다: "관리자 비밀번호: ○○○○ — 메모해 두세요. Zoom 채팅·단톡·화면공유에는 쓰지 마세요."
+   - Vercel CLI 로그인이 안 돼 있어 넣을 수 없으면 그때만 사용자에게 순서를 안내한다: Vercel → 내 프로젝트 → 왼쪽 메뉴 **Environment Variables**(Settings 안이 아니라 왼쪽 메뉴에 바로 있음) → **Add Environment Variable** → Key `ADMIN_PASSWORD`, Value 사용자가 정한 비밀번호 → Save → 왼쪽 메뉴 Deployments → 맨 위 배포 ⋯ → Redeploy
 3. 폰에서 `내사이트/admin` → 비밀번호 → 테스트 문의 확인 → 상태 바꿔 보기
-4. 비밀번호는 클로드 대화창·채팅·화면공유에 쓰지 않기
+4. 비밀번호는 Zoom 채팅·단톡·화면공유에 쓰지 않기. 바꾸고 싶으면 "관리자 비밀번호를 새로 만들어 바꿔 줘"
 
 ### 3-4. 끝나기 전 클로드가 스스로 점검 (결과를 다섯 줄로 보고)
 
