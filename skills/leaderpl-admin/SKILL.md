@@ -26,6 +26,8 @@ description: HTML로 만든 작은 사이트(Vercel 배포)에 문의 폼 저장
 - **브라우저 쪽 코드(HTML·JS)에는 Supabase 키가 하나도 없다.** 저장·조회·수정은 전부 `/api` 함수가 한다.
 - 표에는 **RLS(행 보안)를 켜고 정책은 만들지 않는다** → 공개 키로는 아무도 읽고 쓸 수 없고, 서버 키를 가진 `/api`만 접근한다.
 - 패키지 설치 없이 동작하게 한다(`fetch`로 Supabase REST API 호출). `package.json`이 없어도 된다.
+  `package.json`에 `"type": "module"`이 있으면 `/api` 파일을 `module.exports` 대신 `export default`로 쓴다.
+- `.gitignore`에 `.env*`와 `.vercel`을 넣는다. 커밋 전에 `git diff --cached`로 키처럼 보이는 값이 없는지 본다. 이미 올라간 키는 지우기 전에 "Vercel/Supabase에서 키를 새로 바꿔야 해요"라고 먼저 알린다.
 - 개인정보: 문의 폼에 **수집·이용 동의(필수)**, 관리자 페이지는 **검색 노출 금지(noindex)**.
 - 설명은 쉬운 한국어로. 끝나면 "내가 할 일"을 번호로 알려 준다.
 
@@ -77,6 +79,7 @@ create table if not exists public.inquiries (
   updated_at timestamptz
 );
 alter table public.inquiries enable row level security;
+revoke all on public.inquiries from anon, authenticated;
 -- 정책은 만들지 않는다: 브라우저(공개 키)로는 접근 불가, 서버(/api)만 접근
 ```
 
@@ -185,6 +188,15 @@ module.exports = async (req, res) => {
 2. **Deployments** → 맨 위 배포 → **Redeploy** (환경변수는 다시 배포해야 적용돼요)
 3. 폰에서 `내사이트/admin` → 비밀번호 → 테스트 문의 확인 → 상태 바꿔 보기
 4. 비밀번호는 클로드 대화창·채팅·화면공유에 쓰지 않기
+
+### 3-4. 끝나기 전 클로드가 스스로 점검 (결과를 다섯 줄로 보고)
+
+1. 비밀번호 없이 `GET 내사이트/api/admin` → 401
+2. 브라우저 쪽 파일(HTML·JS) 어디에도 서버 키·비밀번호 값이 없다
+3. Supabase에서 `inquiries` 표의 RLS가 켜져 있다
+4. 깃 기록에 `.env` 파일이 없다 (`git log --all --name-only | grep -c "^\.env"` → 0)
+5. 테스트로 넣은 문의는 목록으로 알려 주고 지우지 않는다(지울지는 사용자가 정한다)
+확인하지 못한 항목은 못 했다고 쓴다.
 
 ## 4. 관리 기능 더하기 (사용자가 하나를 고르면)
 
@@ -298,4 +310,5 @@ module.exports = async (req, res) => {
 2. Supabase **Table Editor**에 `inquiries` 표가 있는가 (없으면 2-0을 다시, 그래도 안 되면 SQL Editor에서 2-1 실행)
 3. 환경변수를 넣은 뒤 **Redeploy** 했는가
 4. 브라우저 개발자 도구가 아니라 **사용자가 본 화면 문구**를 캡처로 받아 원인을 쉬운 말로 설명한다
-5. (회원가입) 가입했는데 로그인이 안 되면 → 확인 메일을 눌렀는지, 또는 5-5의 Confirm email 설정. 메일이 안 오면 → 시간당 발송 한도. 메일 링크가 엉뚱한 주소로 가면 → 5-5의 Site URL
+5. Supabase를 새로 만들 때 "무료 프로젝트 한도" 안내가 뜨면 → 클로드는 기존 프로젝트를 지우거나 멈추거나 결제하지 않는다. 사용자에게 (a) 기존 데이터베이스를 같이 쓰고 표 이름 앞에 사이트 약칭을 붙이기 (b) 사용자가 직접 정리한 뒤 다시 하기 중에서 고르게 한다
+6. (회원가입) 가입했는데 로그인이 안 되면 → 확인 메일을 눌렀는지, 또는 5-5의 Confirm email 설정. 메일이 안 오면 → 시간당 발송 한도. 메일 링크가 엉뚱한 주소로 가면 → 5-5의 Site URL
